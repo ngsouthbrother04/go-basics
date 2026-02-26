@@ -1,8 +1,9 @@
+```go
 package main
 
 import (
-	"fmt"
-	"time"
+ "fmt"
+ "time"
 )
 
 /*
@@ -10,23 +11,23 @@ import (
 Nếu không sẽ bị deadlock vì cả sender và receiver đều chờ nhau để hoàn thành công việc của mình.
 */
 func unbufferedChannel() {
-	ch := make(chan int)
+ ch := make(chan int)
 
-	go func() {
-		// defer close(ch)
-		ch <- 1
-		ch <- 2
-		ch <- 3
-		fmt.Println("Sent")
-	}()
+ go func() {
+  // defer close(ch)
+  ch <- 1
+  ch <- 2
+  ch <- 3
+  fmt.Println("Sent")
+ }()
 
-	for v := range ch {
-		fmt.Println(v)
-	}
+ for v := range ch {
+  fmt.Println(v)
+ }
 
-	fmt.Println("Received")
+ fmt.Println("Received")
 
-	time.Sleep(1 * time.Second)
+ time.Sleep(1 * time.Second)
 }
 
 /*
@@ -37,27 +38,29 @@ Panic và deadlock khi:
 Đối với buffered channel, có thể close ngay sau khi gửi mà không cần defer
 */
 func bufferedChannel() {
-	ch := make(chan int, 3)
+ ch := make(chan int, 3)
 
-	ch <- 1
-	ch <- 2
-	ch <- 3
-	close(ch)
+ ch <- 1
+ ch <- 2
+ ch <- 3
+ close(ch)
 
-	fmt.Println("Sent")
+ fmt.Println("Sent")
 
-	for i := 1; i <= 3; i++ {
-		fmt.Println(<-ch)
-	}
+ for i := 1; i <= 3; i++ {
+  fmt.Println(<-ch)
+ }
 
-	fmt.Println("Received")
+ fmt.Println("Received")
 
-	time.Sleep(1 * time.Second)
+ time.Sleep(1 * time.Second)
 }
 
 func lyThuyetChannel() {
-	// unbufferedChannel()
-	// bufferedChannel()
-	// waitGroupChannel()
-	selectChannel()
+ // unbufferedChannel()
+ // bufferedChannel()
+ // waitGroupChannel()
+ selectChannel()
 }
+
+```

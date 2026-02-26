@@ -1,133 +1,112 @@
-# Goroutines
+# Goroutines & Concurrency trong Go
 
-## Goroutine
+Tài liệu này tổng hợp các ý chính trong thư mục `goroutines`, trình bày lại theo cấu trúc dễ học, dễ tra cứu.
+
+---
+
+## Mục lục
+
+1. [Goroutine](#1-goroutine)
+2. [Defer](#2-defer)
+3. [WaitGroup](#3-waitgroup)
+4. [Channel](#4-channel)
+5. [Select](#5-select)
+6. [Context](#6-context)
+7. [Quản lý CPU trong Go](#7-quản-lý-cpu-trong-go)
+8. [Checklist thực hành](#8-checklist-thực-hành)
+
+---
+
+## 1) Goroutine
 
 ### Goroutine là gì?
-Goroutine là một lightweight thread (luồng nhẹ) được quản lý bởi Go runtime. Đây là một trong những tính năng mạnh mẽ nhất của Go, cho phép thực thi các tác vụ đồng thời (concurrent) một cách hiệu quả.
 
-### Cách khởi tạo Goroutine
-Để khởi tạo goroutine, bạn chỉ cần sử dụng từ khóa `go` trước một hàm hoặc một biểu thức hàm.
+Goroutine là **lightweight thread** do Go runtime quản lý, dùng để chạy tác vụ đồng thời (concurrent).
+
+### Khởi tạo goroutine
 
 ```go
-go task(1)           // Gọi hàm với goroutine
-go func() {          // Hàm ẩn danh với goroutine
+go task(1)
+go func() {
     fmt.Println("Hello from goroutine")
 }()
 ```
 
-### Đặc điểm của Goroutine
+### Đặc điểm quan trọng
 
-#### 1. Chạy đồng thời (Concurrent)
-Khi bạn gọi một hàm với `go`, nó sẽ chạy song song với các goroutine khác và không chặn luồng chính của chương trình.
+- `go f()` **không chặn** luồng hiện tại.
+- Nếu `main` kết thúc trước, các goroutine còn lại sẽ bị dừng.
+- Goroutine nhẹ (stack ban đầu nhỏ), có thể chạy số lượng rất lớn.
+- Thứ tự chạy/hoàn thành là **không xác định** (non-deterministic).
+
+### Ví dụ (rút gọn theo `goroutine.md`)
 
 ```go
-go task(1)    // Không chặn, tiếp tục chạy code bên dưới ngay lập tức
-go task(2)
-// Code tiếp tục chạy mà không đợi task(1) và task(2) hoàn thành
-```
-
-#### 2. Main Goroutine và Program Termination
-Nếu hàm `main` xong trước khi các goroutine hoàn thành công việc của chúng, chương trình sẽ kết thúc và các goroutine sẽ bị dừng lại.
-
-**Vấn đề:**
-```go
-func main() {
-    go task(1)
-    go task(2)
-    // main kết thúc ngay lập tức, các goroutine bị hủy
+func task(id int) {
+    fmt.Printf("Task %d bat dau\n", id)
+    time.Sleep(1 * time.Second)
+    fmt.Printf("Task %d ket thuc\n", id)
 }
-```
 
-**Giải pháp tạm thời:**
-```go
-func main() {
-    go task(1)
-    go task(2)
-    time.Sleep(2 * time.Second)  // Đợi goroutines hoàn thành
-}
-```
+func lyThuyetGoroutines() {
+    start := time.Now()
 
-**Giải pháp tốt hơn:** Sử dụng `sync.WaitGroup` hoặc channel để đồng bộ.
-
-#### 3. Lightweight và hiệu quả
-- Goroutine rất nhẹ, chỉ tốn khoảng 2KB stack ban đầu (so với thread thông thường tốn ~1-2MB)
-- Có thể chạy hàng nghìn, thậm chí hàng triệu goroutine đồng thời
-- Go runtime quản lý scheduling goroutine lên các OS thread
-
-### Ví dụ thực tế
-Trong code mẫu, chúng ta chạy 5 task đồng thời:
-
-```go
-for i := 1; i <= 5; i++ {
-    go task(i)
-}
-```
-
-**Kết quả quan sát:**
-- Nếu chạy tuần tự: 5 task × 1 giây = 5 giây
-- Với goroutine: ~2 giây (vì chạy đồng thời)
-- Thứ tự hoàn thành có thể không theo thứ tự (non-deterministic)
-
-### Lưu ý quan trọng
-
-1. **Không đoán trước được thứ tự thực thi:** Goroutine có thể chạy theo bất kỳ thứ tự nào
-2. **Race condition:** Cần cẩn thận khi nhiều goroutine truy cập cùng một dữ liệu
-3. **Synchronization:** Sử dụng channel, mutex hoặc WaitGroup để đồng bộ
-4. **Main function:** Luôn đảm bảo `main` không kết thúc trước khi goroutine quan trọng hoàn thành
-
-### So sánh: Concurrency vs Parallelism
-
-- **Concurrency (đồng thời):** Nhiều task được quản lý cùng lúc (dealing with multiple things at once)
-- **Parallelism (song song):** Nhiều task thực thi cùng lúc (doing multiple things at once)
-
-Goroutine hỗ trợ cả hai, tùy thuộc vào số CPU cores và cách Go scheduler phân bổ.
-
-### Defer trong Go
-`defer` dùng để trì hoãn việc gọi một hàm cho đến khi hàm bao quanh kết thúc (return hoặc panic). Điều này hữu ích để giải phóng tài nguyên (đóng file, unlock mutex, v.v.).
-
-#### Đặc điểm chính
-- Lệnh `defer` được lưu theo cơ chế LIFO (vào sau, ra trước)
-- Giá trị đối số của `defer` được đánh giá ngay tại thời điểm gặp `defer`
-- `defer` vẫn chạy khi có `panic`, trừ khi chương trình bị `os.Exit`
-
-#### Ví dụ
-```go
-func readFile(path string) error {
-    f, err := os.Open(path)
-    if err != nil {
-        return err
+    for i := 1; i <= 5; i++ {
+        go task(i)
     }
-    defer f.Close() // Luôn đóng file khi hàm kết thúc
 
-    // Xử lý đọc file ở đây
-    return nil
+    time.Sleep(2 * time.Second) // Demo đơn giản, không nên lạm dụng
+    fmt.Println("Tong thoi gian:", time.Since(start))
 }
 ```
 
-#### Ví dụ LIFO
+> Khuyến nghị: thay `time.Sleep` bằng `sync.WaitGroup` hoặc channel để đồng bộ đúng cách.
+
+---
+
+## 2) Defer
+
+`defer` trì hoãn gọi hàm cho đến khi hàm bao quanh kết thúc (return/panic).
+
+### Quy tắc
+
+- Chạy theo thứ tự **LIFO** (vào sau ra trước).
+- Đối số của `defer` được đánh giá ngay tại dòng `defer`.
+- Vẫn chạy khi có `panic` (trừ khi `os.Exit`).
+
+### Ví dụ
+
 ```go
-func main() {
+func deferExample() {
+    fmt.Println("Bat dau deferExample")
+
     defer fmt.Println("defer 1")
     defer fmt.Println("defer 2")
-    fmt.Println("main")
+
+    fmt.Println("Ket thuc deferExample")
 }
+
 // Output:
-// main
+// Bat dau deferExample
+// Ket thuc deferExample
 // defer 2
 // defer 1
 ```
 
-## WaitGroup
+---
 
-`sync.WaitGroup` dùng để đợi một nhóm goroutine hoàn thành. Đây là cách đồng bộ phổ biến khi bạn muốn chắc chắn tất cả goroutine đã xong trước khi tiếp tục.
+## 3) WaitGroup
 
-### Cách dùng cơ bản
-1. Gọi `wg.Add(n)` để tăng bộ đếm lên `n`
-2. Mỗi goroutine khi hoàn thành gọi `wg.Done()` (giảm bộ đếm)
-3. Goroutine chính gọi `wg.Wait()` để đợi bộ đếm về 0
-4. Nếu `WaitGroup` được truyền vào hàm thì nên dùng con trỏ
+`sync.WaitGroup` giúp đợi một nhóm goroutine hoàn thành.
+
+### Cách dùng chuẩn
+
+1. `wg.Add(n)` trước khi launch goroutine.
+2. Mỗi goroutine gọi `defer wg.Done()`.
+3. Goroutine chính gọi `wg.Wait()`.
 
 ### Ví dụ
+
 ```go
 func wgTask(id int, wg *sync.WaitGroup) {
     defer wg.Done()
@@ -145,118 +124,90 @@ func waitGroup() {
         wg.Add(1)
         go wgTask(i, &wg)
     }
-    wg.Wait() // Đợi tất cả goroutine hoàn thành
+    wg.Wait()
 
     fmt.Println("Tong thoi gian:", time.Since(start))
 }
 ```
 
-### Lưu ý quan trọng
+### Lưu ý
 
-- Không gọi `wg.Add()` bên trong goroutine nếu có thể, vì dễ gây race
-- Tránh gọi `wg.Add()` sau khi đã gọi `wg.Wait()`
-- `WaitGroup` chỉ dùng để đợi, không truyền dữ liệu (dùng channel khi cần giao tiếp)
+- Tránh `wg.Add()` bên trong goroutine.
+- Không `Add` sau khi `Wait` đã bắt đầu.
+- `WaitGroup` chỉ để đồng bộ hoàn thành, không truyền dữ liệu.
 
-## Channel
+---
 
-Channel là cơ chế giao tiếp an toàn giữa các goroutine. Có 2 loại: unbuffered và buffered.
+## 4) Channel
 
-### 1. Unbuffered vs Buffered
-
-- Unbuffered: sender và receiver phải bắt tay cùng lúc
-- Buffered: sender có thể gửi trước nếu còn dung lượng buffer
+Channel là cơ chế giao tiếp an toàn giữa các goroutine.
 
 ```go
-ch1 := make(chan int)     // unbuffered
-ch2 := make(chan int, 3)  // buffered, dung lượng 3
+ch1 := make(chan int)    // unbuffered
+ch2 := make(chan int, 3) // buffered
 ```
 
-### 1.1. Tránh dùng channel nil
+### 4.1 Unbuffered vs Buffered
 
-Channel có giá trị `nil` sẽ **block vĩnh viễn** khi gửi hoặc nhận. Vì vậy, không nên khởi tạo channel bằng `var ch chan int` rồi dùng ngay mà chưa `make`.
+- **Unbuffered**: sender và receiver phải gặp nhau tại cùng thời điểm.
+- **Buffered**: sender gửi được khi buffer còn chỗ.
 
-**Ví dụ gây block:**
+### 4.2 Tránh channel `nil`
+
 ```go
 var ch chan int
-ch <- 1        // block vĩnh viễn
+ch <- 1      // block vĩnh viễn
 fmt.Println(<-ch) // block vĩnh viễn
 ```
 
-**Cách đúng:**
+Luôn `make` trước khi dùng:
+
 ```go
 ch := make(chan int)
-ch <- 1
-fmt.Println(<-ch)
 ```
 
-**Lưu ý:** Channel `nil` đôi khi được dùng có chủ đích để **vô hiệu hóa một case** trong `select` (bật/tắt luồng xử lý), nhưng đây là kỹ thuật nâng cao.
+### 4.3 Quy tắc block/deadlock
 
-### 2. Quy tắc block (để tránh deadlock)
+- Một goroutine bị block không sao nếu còn goroutine khác chạy.
+- Nếu tất cả cùng block, Go báo `fatal error: all goroutines are asleep - deadlock!`.
+- `main` kết thúc thì toàn bộ chương trình dừng.
 
-- Bên sẽ block phải được launch trước bên còn lại
-- Không để cả sender và receiver block trên cùng một goroutine
-
-**Đúng (receiver sẵn sàng trước):**
-```go
-ch := make(chan int)
-
-go func() {
-    fmt.Println(<-ch)
-}()
-
-ch <- 1
-```
-
-**Sai (deadlock):**
-```go
-ch := make(chan int)
-
-ch <- 1        // main block ngay tại đây
-go func() {
-    fmt.Println(<-ch)
-}()
-```
-
-### 3. Block có gây crash không?
-
-- Một goroutine block không crash nếu còn goroutine khác chạy
-- Tất cả goroutine đều block thì Go báo lỗi deadlock
-- `main` kết thúc thì toàn bộ chương trình dừng lại
-
-### 4. Đóng channel (close)
+### 4.4 Đóng channel (`close`)
 
 Quy tắc:
-- Chỉ sender mới được `close(ch)`
-- Close sau khi đã gửi xong dữ liệu
-- Gửi vào channel đã đóng sẽ panic
 
-**Pattern nhiều sender + WaitGroup:**
+- Chỉ phía sender đóng channel.
+- Chỉ đóng khi chắc chắn không gửi nữa.
+- Gửi vào channel đã đóng sẽ panic.
+
+### 4.5 `for range` trên channel
+
+`for v := range ch` chỉ dừng khi channel được đóng.
+
 ```go
-var wg sync.WaitGroup
-ch := make(chan string, 10)
-
-for i := 1; i <= 4; i++ {
-    wg.Add(1)
-    go func(id int) {
-        defer wg.Done()
-        ch <- fmt.Sprintf("Task %d", id)
-    }(i)
-}
-
-go func() {
-    wg.Wait()
-    close(ch)
-}()
-
 for v := range ch {
     fmt.Println(v)
 }
 ```
 
-### 5. Directional channel (`chan<-` và `<-chan`)
+Tương đương:
 
-- `chan<-` : chỉ được gửi
-- `<-chan` : chỉ được nhận
+```go
+for {
+    v, ok := <-ch
+    if !ok {
+        break
+    }
+    fmt.Println(v)
+}
+```
+
+> Điểm quan trọng (bổ sung từ code mẫu): nếu dùng `for range` để nhận mà **không có `close(ch)`**, goroutine nhận có thể chờ mãi.
+
+### 4.6 Directional channel
+
+- `chan<- T`: send-only
+- `<-chan T`: receive-only
 
 ```go
 func producer(ch chan<- int) {
@@ -273,45 +224,81 @@ func consumer(ch <-chan int) {
 }
 ```
 
-### 6. `for range` trên channel
+### 4.7 Pattern nhiều goroutine + gom kết quả qua channel
+
+Ví dụ theo `waitGroup+Channel.md`:
 
 ```go
-for v := range ch {
-    fmt.Println(v)
+func channelTask(id int, ch chan<- string, wg *sync.WaitGroup) {
+    defer wg.Done()
+
+    fmt.Printf("Task %d bat dau\n", id)
+    time.Sleep(1 * time.Second)
+    ch <- fmt.Sprintf("Task %d ket thuc\n", id)
 }
-```
 
-Tương đương:
-```go
-for {
-    v, ok := <-ch
-    if !ok {
-        break
+func waitGroupChannel() {
+    var wg sync.WaitGroup
+    ch := make(chan string)
+
+    for i := 1; i <= 4; i++ {
+        wg.Add(1)
+        go channelTask(i, ch, &wg)
     }
-    fmt.Println(v)
+
+    go func() {
+        wg.Wait()
+        close(ch)
+    }()
+
+    for v := range ch {
+        fmt.Print(v)
+    }
 }
 ```
 
-### 7. `select` trong channel
+---
 
-`select` cho phép chờ và xử lý nhiều thao tác channel cùng lúc. Nó giống `switch`, nhưng mỗi `case` là một thao tác gửi/nhận trên channel.
+## 5) Select
 
-#### Quy tắc quan trọng
-- Nếu nhiều `case` sẵn sàng, Go sẽ chọn ngẫu nhiên một case để tránh starvation.
-- Nếu không có `case` nào sẵn sàng và **không có** `default`, `select` sẽ block.
-- Nếu có `default`, `select` sẽ chạy ngay `default` khi không có case sẵn sàng.
+`select` chờ nhiều thao tác channel cùng lúc.
 
-#### Ví dụ nhận từ nhiều channel
+### Quy tắc
+
+- Nếu nhiều case sẵn sàng, Go chọn ngẫu nhiên một case.
+- Không case nào sẵn sàng và không có `default` -> block.
+- Có `default` -> non-blocking select.
+
+### Ví dụ nhận từ nhiều channel (theo `select.md`)
+
 ```go
-select {
-case msg1 := <-ch1:
-    fmt.Println("ch1:", msg1)
-case msg2 := <-ch2:
-    fmt.Println("ch2:", msg2)
+func selectChannel() {
+    ch1 := make(chan string)
+    ch2 := make(chan string)
+
+    go func() {
+        time.Sleep(3 * time.Second)
+        ch1 <- "Hello from channel 1"
+    }()
+
+    go func() {
+        time.Sleep(1 * time.Second)
+        ch2 <- "Hello from channel 2"
+    }()
+
+    for i := 1; i <= 2; i++ {
+        select {
+        case msg1 := <-ch1:
+            fmt.Println(msg1)
+        case msg2 := <-ch2:
+            fmt.Println(msg2)
+        }
+    }
 }
 ```
 
-#### Ví dụ timeout với `time.After`
+### Timeout với `time.After`
+
 ```go
 select {
 case msg := <-ch:
@@ -321,20 +308,138 @@ case <-time.After(1 * time.Second):
 }
 ```
 
-#### Ví dụ non-blocking với `default`
+---
+
+## 6) Context
+
+`context` giúp:
+
+- hủy công việc đang chạy,
+- giới hạn thời gian,
+- truyền metadata xuyên suốt call chain.
+
+### 6.1 `context.Background()`
+
+Context gốc, dùng ở điểm khởi đầu.
+
 ```go
-select {
-case msg := <-ch:
-    fmt.Println("Nhan:", msg)
-default:
-    fmt.Println("Khong co du lieu, tiep tuc lam viec")
+ctx := context.Background()
+```
+
+### 6.2 `context.WithCancel()`
+
+```go
+ctx, cancel := context.WithCancel(context.Background())
+defer cancel()
+
+go worker(ctx)
+cancel() // gửi tín hiệu dừng
+```
+
+### 6.3 `context.WithTimeout()`
+
+```go
+ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+defer cancel()
+
+result, err := callAPI(ctx)
+if err != nil {
+    fmt.Println(err) // context deadline exceeded
 }
 ```
 
-### 8. Checklist nhanh
+### 6.4 `context.WithDeadline()`
 
-- Unbuffered cần đồng bộ chặt
-- Buffered vẫn cần close đúng lúc
-- Close: chỉ sender, chỉ 1 lần
-- Dùng `for range` để đọc đến khi channel đóng
-- Tránh goroutine leak bằng done channel hoặc `context`
+```go
+deadline := time.Now().Add(5 * time.Second)
+ctx, cancel := context.WithDeadline(context.Background(), deadline)
+defer cancel()
+```
+
+### 6.5 `context.WithValue()`
+
+Chỉ nên dùng cho metadata (request ID, trace ID, auth info nhẹ), không dùng để chở business data.
+
+```go
+type keyType string
+const requestIDKey keyType = "requestID"
+
+ctx := context.WithValue(context.Background(), requestIDKey, "REQ-12345")
+```
+
+### Quy tắc vàng với context
+
+1. Luôn là tham số đầu tiên: `func Do(ctx context.Context, ...)`
+2. Không nhúng context vào struct.
+3. Luôn gọi `cancel()` sau `WithCancel/WithTimeout/WithDeadline`.
+4. Không truyền `nil` context.
+
+---
+
+## 7) Quản lý CPU trong Go
+
+Khi học goroutine, cần tách rõ 2 ý:
+
+- **Concurrency**: tổ chức nhiều công việc cùng tiến triển.
+- **Parallelism**: nhiều công việc thực sự chạy cùng lúc trên nhiều core CPU.
+
+### 7.1 `runtime.NumCPU()` và `runtime.GOMAXPROCS()`
+
+- `runtime.NumCPU()`: trả về số logical CPU của máy.
+- `runtime.GOMAXPROCS(n)`: đặt số OS thread có thể chạy Go code đồng thời.
+
+```go
+numCPU := runtime.NumCPU()
+fmt.Println("CPU cores:", numCPU)
+
+old := runtime.GOMAXPROCS(numCPU)
+fmt.Println("Old GOMAXPROCS:", old)
+```
+
+> Từ Go 1.5+, mặc định `GOMAXPROCS` thường đã bằng số CPU khả dụng, nhưng vẫn nên hiểu để tuning khi benchmark.
+
+### 7.2 Mô hình G-M-P (nên nhớ ngắn gọn)
+
+- **G (Goroutine)**: tác vụ bạn tạo bằng `go`.
+- **M (Machine)**: OS thread thật.
+- **P (Processor)**: tài nguyên scheduler để chạy goroutine.
+
+Go scheduler gán nhiều `G` lên một nhóm `M/P`, giúp chạy hiệu quả với chi phí thấp hơn thread truyền thống.
+
+### 7.3 Khi nào cần quan tâm CPU tuning?
+
+- **I/O-bound** (HTTP, DB, file): thường không cần chỉnh nhiều, tập trung vào concurrency + timeout/context.
+- **CPU-bound** (tính toán nặng): đo đạc với các mức `GOMAXPROCS` khác nhau để tìm điểm tối ưu.
+
+### 7.4 Ghi chú thực tế từ bài test `heavyTask`
+
+- Số goroutine nên dùng vòng lặp `for i := 0; i < n; i++` để tránh chạy dư 1 task.
+- Với phép cộng lớn, nên dùng `int64` để an toàn hơn trên mọi kiến trúc.
+- Nên giữ kết quả tính toán (hoặc cộng dồn) để tránh bị tối ưu bỏ công việc khi benchmark.
+
+Ví dụ khung đo thời gian:
+
+```go
+start := time.Now()
+runtime.GOMAXPROCS(runtime.NumCPU())
+
+var wg sync.WaitGroup
+for i := 0; i < 20; i++ {
+    wg.Add(1)
+    go heavyTask(&wg)
+}
+wg.Wait()
+
+fmt.Println("Time taken:", time.Since(start))
+```
+
+---
+
+## 8) Checklist thực hành
+
+- Ưu tiên `WaitGroup`/channel thay cho `time.Sleep` để đồng bộ.
+- Dùng `close(ch)` đúng phía sender, đúng thời điểm.
+- Khi đọc bằng `for range ch`, đảm bảo có nơi đóng channel.
+- Dùng directional channel để giới hạn quyền send/receive.
+- Dùng `select + time.After` để chống treo khi chờ dữ liệu.
+- Truyền `context` xuyên suốt các hàm có I/O hoặc tác vụ dài.
