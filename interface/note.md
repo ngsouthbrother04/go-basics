@@ -1,4 +1,3 @@
-```markdown
 # Interface trong Go – Ghi chú ôn tập ngắn gọn và có hệ thống
 
 ## Tư duy cốt lõi
