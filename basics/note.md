@@ -37,49 +37,9 @@ go 1.20
 package main
 
 import "fmt"
-````markdown
-**Ghi chú về Module, Package và chương trình trong Go**
-
-**Khái niệm chính**
-
-- **Module**: Một module được khai báo bằng file `go.mod`. Module là một tập hợp các package và xác định gốc của đường dẫn import (module path). Một repository có thể chứa một hoặc nhiều module.
-
-- **Package**: Mỗi package tương đương với một thư mục chứa các file `.go` (ngoại trừ trường hợp đặc biệt với test). Tất cả file `.go` (không bao gồm `_test.go`) trong cùng một thư mục phải khai báo cùng một tên package.
-
-- **File Go**: Một package có thể gồm nhiều file `.go`. Khi biên dịch, tất cả file trong cùng package sẽ được biên dịch chung thành một đơn vị.
-
-**Package `main` và hàm `main`**
-
-- **Package `main`**: Nếu một package có tên là `main`, khi build nó sẽ sinh ra một chương trình thực thi (executable/binary).
-
-- **Hàm `main`**: Để tạo chương trình có thể chạy được, package `main` phải định nghĩa một hàm `func main()`. Thông thường chỉ nên có một định nghĩa `main()` trong package `main` (nhiều định nghĩa sẽ gây lỗi khi build).
-
-- **Lưu ý**: Các package khác (không phải `main`) là thư viện và không sinh ra executable.
-
-**Quy tắc và thực hành thường gặp**
-
-- **Một package — một thư mục**: Quy tắc phổ biến là một thư mục = một package. File test (`_test.go`) có thể khai báo package khác (ví dụ `pkg_test`) để viết test độc lập.
-
-- **Export**: Identifier (hàm, biến, type, const) bắt đầu bằng chữ in hoa là được export (công khai), bắt đầu bằng chữ thường là private trong package.
-
-- **`go.mod`**: File `go.mod` nằm ở gốc module, chứa tên module và phiên bản Go dùng. Ví dụ:
-
-```go
-module example.com/mymodule
-
-go 1.20
-```
-
-**Ví dụ đơn giản**
-- File `main.go` trong package `main`:
-
-```go
-package main
-
-import "fmt"
 
 func main() {
-    fmt.Println("Hello, world")
+    fmt.Println("Hello World")
 }
 ```
 
@@ -90,32 +50,11 @@ func main() {
 
 Nếu muốn, tôi có thể thêm ví dụ về nhiều package trong cùng một module hoặc giải thích `go mod`/`go build`/`go run` chi tiết hơn.
 
-Tốt. Ta **bắt đầu PHASE 1 – GO CORE & MINDSET** ngay bây giờ, theo đúng giáo trình và style big tech.
-Mục tiêu của buổi này: **đặt nền tư duy Go + viết được chương trình Go đầu tiên, hiểu rõ cấu trúc và zero-value**.
-
 ---
 
-## 4. Biến & Zero Value (KHÁC Java / JS)
+## 4. Biến & Zero Value
 
-### Trích từ Chapter 2–3: *Types* & *Variables* 
-
-**Ghi chú về Module, Package và chương trình trong Go**
-
----
-
-1. Khái niệm cơ bản
-- Module: khai báo bằng `go.mod`. Module gom nhiều package và xác định module path (gốc import). Một repo có thể chứa nhiều module.
-- Package: tương ứng một thư mục chứa các file `.go`. Tất cả file `.go` (không bao gồm `_test.go`) trong cùng thư mục phải khai báo cùng tên package.
-- File Go: Một package có thể có nhiều file `.go`; khi build chúng được biên dịch chung.
-
-2. Package `main` và chương trình thực thi
-- Package `main` → khi build sẽ tạo executable.
-- Để chương trình chạy được phải có `func main()` trong package `main`.
-- Các package khác (không phải `main`) là thư viện (library), không tạo executable.
-
----
-
-4. Biến & Zero Value (khác Java/JS)
+1. Biến & Zero Value (khác Java/JS)
 
 Trích từ Chapter 2–3: Types & Variables
 
@@ -187,7 +126,7 @@ const (
 
 ---
 
-5. So sánh nhanh với Java / JS (để tránh lỗi tư duy)
+2. So sánh nhanh với Java / JS (để tránh lỗi tư duy)
 
 | Java / JS       | Go                  |
 | --------------- | ------------------- |
